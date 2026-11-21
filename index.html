@@ -26,7 +26,6 @@
   button{font-family:inherit; cursor:pointer;}
   .hidden{display:none !important;}
 
-  /* ---------- Top bar ---------- */
   header{
     display:flex; align-items:center; gap:10px; padding:12px 14px;
     background:var(--panel); border-bottom:1px solid var(--line); flex-shrink:0;
@@ -40,7 +39,6 @@
   }
   .iconbtn:active{background:#2a3242;}
 
-  /* ---------- Setup screen ---------- */
   #setup{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 16px 40px;}
   .card{
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
@@ -48,6 +46,8 @@
   }
   .card h2{margin:0 0 4px; font-size:16px;}
   .card p.hint{margin:0 0 14px; color:var(--dim); font-size:13px; line-height:1.5;}
+  .tag{font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:6px; background:var(--panel2); color:var(--dim); vertical-align:middle;}
+  .tag.on{background:rgba(52,199,123,.15); color:var(--good);}
   .tabs{display:flex; gap:6px; margin-bottom:16px; max-width:560px; margin-left:auto; margin-right:auto;}
   .tab{
     flex:1; text-align:center; padding:11px 8px; border-radius:10px; font-size:13px; font-weight:600;
@@ -67,10 +67,10 @@
     font-size:15px; font-weight:700;
   }
   .btn-primary:active{filter:brightness(.92);}
-  .status{margin-top:12px; font-size:13px; min-height:18px; line-height:1.4;}
+  .status{margin-top:12px; font-size:13px; min-height:18px; line-height:1.4; word-break:break-word;}
   .status.err{color:var(--bad);} .status.ok{color:var(--good);} .status.wait{color:var(--dim);}
+  .hosts{margin-top:10px; font-size:12px; color:var(--dim); line-height:1.5; word-break:break-word;}
 
-  /* ---------- Channel list ---------- */
   #browse{flex:1; display:flex; flex-direction:column; overflow:hidden;}
   .filters{display:flex; gap:8px; padding:10px 12px; background:var(--panel); border-bottom:1px solid var(--line); flex-shrink:0;}
   .filters input{flex:1; padding:10px 12px; font-size:14px;}
@@ -96,20 +96,17 @@
   .fav{font-size:18px; color:var(--dim); padding:4px 6px;}
   .fav.on{color:#ffcb45;}
 
-  /* ---------- Player ---------- */
   #player{position:fixed; inset:0; background:#000; z-index:50; display:flex; flex-direction:column;}
   #player .pbar{
     display:flex; align-items:center; gap:10px; padding:12px 14px;
     padding-top:calc(12px + env(safe-area-inset-top));
     background:linear-gradient(180deg,rgba(0,0,0,.8),rgba(0,0,0,0)); position:absolute; top:0; left:0; right:0; z-index:2;
-    transition:opacity .3s;
   }
   #player .pbar .title{flex:1; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   #vwrap{flex:1; display:flex; align-items:center; justify-content:center;}
   video{width:100%; height:100%; background:#000;}
-  .pmsg{position:absolute; bottom:40px; left:0; right:0; text-align:center; color:var(--dim); font-size:13px; padding:0 20px; line-height:1.5;}
+  .pmsg{position:absolute; bottom:90px; left:0; right:0; text-align:center; color:#c9d0dc; font-size:13px; padding:0 20px; line-height:1.5; word-break:break-word;}
   footer{padding:7px 14px; text-align:center; color:#5a6475; font-size:11px; background:var(--panel); border-top:1px solid var(--line); flex-shrink:0;}
-  a{color:var(--accent);}
 </style>
 </head>
 <body>
@@ -129,30 +126,27 @@
     <div class="tab" data-tab="xtream">Xtream</div>
   </div>
 
-  <!-- Paste -->
   <div class="card tabpane" data-pane="paste">
     <h2>Paste your playlist</h2>
-    <p class="hint">Always works, on any device. Open your M3U playlist in a browser or a text app, copy everything, and paste it here.</p>
+    <p class="hint">Works everywhere. Open your playlist link in a new Safari tab, copy all the text it shows (it starts with #EXTM3U), and paste it here.</p>
     <label>M3U content</label>
     <textarea id="pasteBox" placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-name=&quot;...&quot; group-title=&quot;News&quot;,Channel 1&#10;http://.../stream.m3u8"></textarea>
     <button class="btn-primary" id="loadPaste">Load channels</button>
     <div class="status" id="st-paste"></div>
   </div>
 
-  <!-- URL -->
   <div class="card tabpane hidden" data-pane="url">
     <h2>Load from M3U URL</h2>
-    <p class="hint">Fetches the playlist directly. Works when this page is opened normally in Safari (saved to your phone), not when viewed through a hosting sandbox.</p>
+    <p class="hint">Needs the Helper below unless your provider allows browsers to connect directly. Use an http:// link exactly as your provider gave it.</p>
     <label>Playlist URL</label>
     <input id="urlBox" type="url" placeholder="http://provider.com/get.php?username=...&type=m3u_plus" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="btn-primary" id="loadUrl">Fetch &amp; load</button>
     <div class="status" id="st-url"></div>
   </div>
 
-  <!-- Xtream -->
   <div class="card tabpane hidden" data-pane="xtream">
     <h2>Xtream Codes login</h2>
-    <p class="hint">Enter the server, username and password your provider gave you.</p>
+    <p class="hint">Server, username and password from your provider. Needs the Helper below unless your provider allows browsers to connect directly.</p>
     <label>Server URL</label>
     <input id="xHost" type="url" placeholder="http://server.com:8080" autocapitalize="off" autocorrect="off" spellcheck="false">
     <label>Username</label>
@@ -161,6 +155,16 @@
     <input id="xPass" type="text" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="btn-primary" id="loadXtream">Connect</button>
     <div class="status" id="st-xtream"></div>
+  </div>
+
+  <div class="card">
+    <h2>Helper <span class="tag" id="helperTag">off</span></h2>
+    <p class="hint">Optional. Many providers refuse connections that come straight from a web page. The helper is a small free service you run yourself (setup steps are in the guide) that fetches streams for the page the way a normal player app would.</p>
+    <label>Helper address</label>
+    <input id="helperBox" type="url" placeholder="https://mytv-helper.yourname.workers.dev" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="btn-primary" id="saveHelper">Save &amp; test</button>
+    <div class="status" id="st-helper"></div>
+    <div class="hosts" id="hostsLine"></div>
   </div>
 
   <div class="card" style="text-align:center;">
@@ -190,7 +194,7 @@
   <div class="pmsg hidden" id="pmsg"></div>
 </section>
 
-<footer>Plays HLS (m3u8) and raw MPEG-TS streams · Your playlist stays on this device</footer>
+<footer>Plays HLS and MPEG-TS live streams · Your playlist stays on this device</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mpegts.js/dist/mpegts.js"></script>
 <script>
@@ -203,6 +207,23 @@
   function get(k){try{return localStorage.getItem(k);}catch(e){return null;}}
   function loadFavs(){try{return JSON.parse(get("favs")||"[]");}catch(e){return [];}}
   function saveFavs(){save("favs",JSON.stringify(favs));}
+
+  // ---------- helper (optional proxy) ----------
+  function getHelper(){
+    var h=(get("helper")||"").trim().replace(/\/+$/,"");
+    return /^https:\/\//i.test(h)?h:"";
+  }
+  // kind: "hls" = a playlist the helper must rewrite, anything else = pass through
+  function proxify(u,kind){
+    var h=getHelper();
+    if(!h) return u;
+    return h+(kind==="hls"?"/p.m3u8":"/s")+"?u="+encodeURIComponent(u);
+  }
+  function showHelperTag(){
+    var t=document.getElementById("helperTag"), on=!!getHelper();
+    t.textContent=on?"on":"off";
+    t.className="tag"+(on?" on":"");
+  }
 
   // ---------- M3U parser ----------
   function parseM3U(text){
@@ -228,7 +249,30 @@
     return m?m[1]:"";
   }
 
+  // ---------- which ways to try a stream ----------
+  // Xtream-style links (.../user/pass/12345.ts) usually also exist as .m3u8, which
+  // the phone's built-in player handles best, so try that first and fall back to TS.
+  function candidates(url){
+    var list=[];
+    if(/\.m3u8(\?|$)/i.test(url)){
+      list.push({kind:"hls",url:url});
+      return list;
+    }
+    var m=url.match(/^(https?:\/\/[^\/]+)\/(?:live\/)?([^\/]+)\/([^\/]+)\/(\d+)(?:\.(?:ts|m3u8))?$/i);
+    if(m) list.push({kind:"hls",url:m[1]+"/live/"+m[2]+"/"+m[3]+"/"+m[4]+".m3u8"});
+    list.push({kind:"ts",url:url});
+    return list;
+  }
+  window.__mytv={candidates:candidates,proxify:proxify,parseM3U:parseM3U};
+
   // ---------- load into UI ----------
+  function hostsOf(list){
+    var seen={}, out=[];
+    list.slice(0,3000).forEach(function(c){
+      try{var h=new URL(c.url).hostname; if(!seen[h]){seen[h]=1; out.push(h);}}catch(e){}
+    });
+    return out;
+  }
   function setChannels(list){
     if(!list.length){throw new Error("No channels found in that playlist.");}
     channels=list;
@@ -238,6 +282,8 @@
     Object.keys(groups).sort().forEach(function(g){
       var o=document.createElement("option"); o.value=g; o.textContent=g+" ("+groups[g]+")"; sel.appendChild(o);
     });
+    var hs=hostsOf(list);
+    document.getElementById("hostsLine").textContent=hs.length?("Servers used by your playlist: "+hs.join(", ")+". If the helper says it isn't set up for one of them, add it to ALLOWED_HOSTS in the helper."):"";
     show("browse");
     document.getElementById("btnReload").classList.remove("hidden");
     document.getElementById("btnSetup").classList.remove("hidden");
@@ -287,56 +333,76 @@
 
   // ---------- player ----------
   var video=document.getElementById("video");
-  var tsPlayer=null;
-  function destroyTsPlayer(){
+  var tsPlayer=null, watchdog=null, playToken=0;
+  var MEDIA_ERR={1:"stopped",2:"network problem",3:"could not decode",4:"format or server refused"};
+
+  function cleanup(){
+    clearTimeout(watchdog);
     if(tsPlayer){
       try{ tsPlayer.pause(); tsPlayer.unload(); tsPlayer.detachMediaElement(); tsPlayer.destroy(); }catch(e){}
       tsPlayer=null;
     }
+    video.onerror=null; video.onplaying=null; video.onloadeddata=null;
+    video.removeAttribute("src");
+    try{ video.load(); }catch(e){}
   }
+  function stopAll(){ playToken++; cleanup(); }
+
   function play(c){
     document.getElementById("pTitle").textContent=c.name;
     show("player");
     var msg=document.getElementById("pmsg"); msg.classList.add("hidden");
-    destroyTsPlayer();
-    video.removeAttribute("src"); video.load();
+    stopAll();
+    var token=playToken, tries=candidates(c.url), notes=[];
 
-    var isHls=/\.m3u8(\?|$)/i.test(c.url);
-
-    function showError(extra){
-      var mixed = c.url.indexOf("http://")===0 && location.protocol==="https:";
-      msg.textContent = mixed
-        ? "Couldn't play this channel — the page is loaded securely (https) but this stream is http, and Safari blocks that mix. If your provider offers an https:// link, that would work directly."
-        : "Couldn't play this channel"+(extra?(" ("+extra+")"):"")+". Try another channel — this one's format or server may not be supported.";
-      msg.classList.remove("hidden");
+    function fail(){
+      var m="Couldn't play this channel. "+notes.join(" · ")+".";
+      if(!getHelper()) m+=" Tip: set up the Helper (Sources screen) — it fixes channels the provider blocks from web pages.";
+      msg.textContent=m; msg.classList.remove("hidden");
     }
 
-    if(isHls){
-      video.src=c.url;
-      var p=video.play();
-      if(p&&p.catch){p.catch(function(){});}
-      video.onerror=function(){ showError("HLS playback failed"); };
-    } else if(window.mpegts && mpegts.isSupported()){
-      try{
-        tsPlayer=mpegts.createPlayer({type:"mpegts", isLive:true, url:c.url});
-        tsPlayer.attachMediaElement(video);
-        tsPlayer.on(mpegts.Events.ERROR, function(errorType, errorDetail){
-          showError(String(errorType)+(errorDetail?(": "+errorDetail):""));
-        });
-        tsPlayer.load();
-        var p2=tsPlayer.play();
-        if(p2&&p2.catch){p2.catch(function(){});}
-      }catch(e){ showError(e.message); }
-    } else {
-      video.src=c.url;
-      var p3=video.play();
-      if(p3&&p3.catch){p3.catch(function(){});}
-      video.onerror=function(){ showError("format not supported on this device"); };
+    function attempt(i){
+      if(token!==playToken) return;
+      cleanup();
+      if(i>=tries.length){ fail(); return; }
+      var t=tries[i], src=proxify(t.url,t.kind), moved=false, started=false;
+
+      function bad(why){
+        if(moved||token!==playToken) return;
+        if(started){ msg.textContent="The stream stopped ("+why+"). Go back and tap the channel again."; msg.classList.remove("hidden"); return; }
+        moved=true;
+        notes.push((t.kind==="hls"?"HLS":"TS")+": "+why);
+        attempt(i+1);
+      }
+      function ok(){
+        started=true; clearTimeout(watchdog); msg.classList.add("hidden");
+      }
+
+      if(t.kind==="hls"){
+        video.onerror=function(){ var e=video.error; bad(e?(MEDIA_ERR[e.code]||("error "+e.code)):"error"); };
+        video.onplaying=ok; video.onloadeddata=ok;
+        video.src=src;
+        var p=video.play(); if(p&&p.catch){p.catch(function(){});}
+      } else {
+        if(!(window.mpegts && mpegts.isSupported())){ bad("not supported on this device"); return; }
+        try{
+          tsPlayer=mpegts.createPlayer({type:"mpegts", isLive:true, url:src});
+          tsPlayer.attachMediaElement(video);
+          tsPlayer.on(mpegts.Events.ERROR,function(type,detail,info){
+            var code=info&&(info.code||info.msg);
+            bad(String(type)+(detail?(": "+detail):"")+(code?(" ("+code+")"):""));
+          });
+          video.onplaying=ok; video.onloadeddata=ok;
+          tsPlayer.load();
+          var p2=tsPlayer.play(); if(p2&&p2.catch){p2.catch(function(){});}
+        }catch(e){ bad(e&&e.message?e.message:"could not start"); return; }
+      }
+      watchdog=setTimeout(function(){ bad("no data after 15 seconds"); },15000);
     }
+    attempt(0);
   }
   document.getElementById("btnBack").onclick=function(){
-    destroyTsPlayer();
-    video.pause(); video.removeAttribute("src"); video.load();
+    stopAll();
     show("browse");
   };
 
@@ -361,10 +427,21 @@
   // ---------- loaders ----------
   function st(id,msg,cls){var e=document.getElementById(id); e.textContent=msg; e.className="status "+(cls||"");}
 
+  function fetchText(url){
+    return fetch(proxify(url,"txt")).then(function(r){
+      if(!r.ok) throw new Error("the server answered "+r.status);
+      return r.text();
+    });
+  }
+  function hint(){ return getHelper()?"":" If this keeps failing, use the Paste list tab, or set up the Helper below."; }
+
   document.getElementById("loadPaste").onclick=function(){
     try{
       var txt=document.getElementById("pasteBox").value;
       if(!txt.trim()){st("st-paste","Paste your playlist text first.","err"); return;}
+      if(/^\s*https?:\/\//i.test(txt) && txt.trim().indexOf("\n")<0){
+        st("st-paste","That's a link, not the playlist itself. Open the link in a new Safari tab, copy the text it shows (starts with #EXTM3U), and paste that here.","err"); return;
+      }
       var list=parseM3U(txt);
       save("lastM3U",txt);
       setChannels(list);
@@ -374,17 +451,17 @@
   document.getElementById("loadUrl").onclick=function(){
     var url=document.getElementById("urlBox").value.trim();
     if(!url){st("st-url","Enter a playlist URL.","err"); return;}
+    if(/^https:\/\/[^\/]+:80(\/|$)/i.test(url)){
+      st("st-url","This link says https:// but uses port 80, which is a plain http port. Try http:// instead.","err"); return;
+    }
     st("st-url","Fetching…","wait");
-    fetch(url).then(function(r){
-      if(!r.ok) throw new Error("Server returned "+r.status);
-      return r.text();
-    }).then(function(txt){
+    fetchText(url).then(function(txt){
       var list=parseM3U(txt);
       save("lastM3U",txt);
       st("st-url","Loaded "+list.length+" channels.","ok");
       setChannels(list);
     }).catch(function(e){
-      st("st-url","Couldn't load — "+e.message+". Try the “Paste list” tab instead.","err");
+      st("st-url","Couldn't load ("+e.message+")."+hint(),"err");
     });
   };
 
@@ -395,21 +472,32 @@
     if(!host||!u||!p){st("st-xtream","Fill in all three fields.","err"); return;}
     st("st-xtream","Connecting…","wait");
     var api=host+"/player_api.php?username="+encodeURIComponent(u)+"&password="+encodeURIComponent(p)+"&action=get_live_streams";
-    fetch(api).then(function(r){return r.json();}).then(function(arr){
-      if(!Array.isArray(arr)||!arr.length) throw new Error("No live streams returned — check your username/password/server.");
+    fetchText(api).then(function(txt){return JSON.parse(txt);}).then(function(arr){
+      if(!Array.isArray(arr)||!arr.length) throw new Error("no live streams returned — check the username, password and server");
       var list=arr.map(function(s){
         return {
           name:s.name||("Channel "+s.stream_id),
           logo:s.stream_icon||"",
           group:s.category_name||"Live",
-          url:host+"/live/"+encodeURIComponent(u)+"/"+encodeURIComponent(p)+"/"+s.stream_id+".m3u8"
+          url:host+"/live/"+encodeURIComponent(u)+"/"+encodeURIComponent(p)+"/"+s.stream_id+".ts"
         };
       });
       st("st-xtream","Connected — "+list.length+" channels.","ok");
       setChannels(list);
     }).catch(function(e){
-      st("st-xtream","Couldn't connect — "+e.message+". Double-check the details, or try “Paste list”.","err");
+      st("st-xtream","Couldn't connect ("+e.message+")."+hint(),"err");
     });
+  };
+
+  document.getElementById("saveHelper").onclick=function(){
+    var v=document.getElementById("helperBox").value.trim().replace(/\/+$/,"");
+    if(!v){ save("helper",""); showHelperTag(); st("st-helper","Helper turned off — connecting directly.","ok"); return; }
+    if(!/^https:\/\//i.test(v)){ st("st-helper","The helper address must start with https://","err"); return; }
+    st("st-helper","Testing…","wait");
+    fetch(v+"/").then(function(r){return r.text();}).then(function(t){
+      if(t.indexOf("MyTV helper")<0) throw new Error("that address did not answer like the helper");
+      save("helper",v); showHelperTag(); st("st-helper","Helper is running ✓ — channels and playlists now go through it.","ok");
+    }).catch(function(e){ st("st-helper","Couldn't reach it ("+e.message+").","err"); });
   };
 
   document.getElementById("search").oninput=render;
@@ -422,7 +510,10 @@
     else show("setup");
   };
 
+  // ---------- restore last session ----------
   (function init(){
+    document.getElementById("helperBox").value=getHelper();
+    showHelperTag();
     var txt=get("lastM3U");
     if(txt){
       document.getElementById("pasteBox").value=txt;
