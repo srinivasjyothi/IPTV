@@ -189,8 +189,9 @@
   <div class="pmsg hidden" id="pmsg"></div>
 </section>
 
-<footer>Plays HLS (m3u8) streams natively in Safari · Your playlist stays on this device</footer>
+<footer>Plays HLS (m3u8) and raw MPEG-TS streams · Your playlist stays on this device</footer>
 
+<script src="https://cdn.jsdelivr.net/npm/mpegts.js/dist/mpegts.js"></script>
 <script>
 (function(){
   "use strict";
@@ -285,22 +286,53 @@
 
   // ---------- player ----------
   var video=document.getElementById("video");
+  var tsPlayer=null;
+  function destroyTsPlayer(){
+    if(tsPlayer){
+      try{ tsPlayer.pause(); tsPlayer.unload(); tsPlayer.detachMediaElement(); tsPlayer.destroy(); }catch(e){}
+      tsPlayer=null;
+    }
+  }
   function play(c){
     document.getElementById("pTitle").textContent=c.name;
     show("player");
     var msg=document.getElementById("pmsg"); msg.classList.add("hidden");
-    video.src=c.url;
-    var p=video.play();
-    if(p&&p.catch){p.catch(function(){});}
-    video.onerror=function(){
+    destroyTsPlayer();
+    video.removeAttribute("src"); video.load();
+
+    var isHls=/\.m3u8(\?|$)/i.test(c.url);
+
+    function showError(extra){
       var mixed = c.url.indexOf("http://")===0 && location.protocol==="https:";
       msg.textContent = mixed
         ? "Couldn't play this channel — the page is loaded securely (https) but this stream is http, and Safari blocks that mix. If your provider offers an https:// link, that would work directly."
-        : "Couldn't play this channel. Safari plays HLS (.m3u8) streams; other formats like raw MPEG-TS won't play in a browser. Try another channel.";
+        : "Couldn't play this channel"+(extra?(" ("+extra+")"):"")+". Try another channel — this one's format or server may not be supported.";
       msg.classList.remove("hidden");
-    };
+    }
+
+    if(isHls){
+      video.src=c.url;
+      var p=video.play();
+      if(p&&p.catch){p.catch(function(){});}
+      video.onerror=function(){ showError("HLS playback failed"); };
+    } else if(window.mpegts && mpegts.isSupported()){
+      try{
+        tsPlayer=mpegts.createPlayer({type:"mpegts", isLive:true, url:c.url});
+        tsPlayer.attachMediaElement(video);
+        tsPlayer.on(mpegts.Events.ERROR, function(){ showError("MPEG-TS stream error"); });
+        tsPlayer.load();
+        var p2=tsPlayer.play();
+        if(p2&&p2.catch){p2.catch(function(){});}
+      }catch(e){ showError(e.message); }
+    } else {
+      video.src=c.url;
+      var p3=video.play();
+      if(p3&&p3.catch){p3.catch(function(){});}
+      video.onerror=function(){ showError("format not supported on this device"); };
+    }
   }
   document.getElementById("btnBack").onclick=function(){
+    destroyTsPlayer();
     video.pause(); video.removeAttribute("src"); video.load();
     show("browse");
   };
