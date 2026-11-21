@@ -48,9 +48,9 @@
   .card p.hint{margin:0 0 14px; color:var(--dim); font-size:13px; line-height:1.5;}
   .tag{font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:6px; background:var(--panel2); color:var(--dim); vertical-align:middle;}
   .tag.on{background:rgba(52,199,123,.15); color:var(--good);}
-  .tabs{display:flex; gap:6px; margin-bottom:16px; max-width:560px; margin-left:auto; margin-right:auto;}
+  .tabs{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; max-width:560px; margin-left:auto; margin-right:auto;}
   .tab{
-    flex:1; text-align:center; padding:11px 8px; border-radius:10px; font-size:13px; font-weight:600;
+    flex:1 1 30%; text-align:center; padding:11px 6px; border-radius:10px; font-size:13px; font-weight:600;
     background:var(--panel); border:1px solid var(--line); color:var(--dim);
   }
   .tab.active{background:var(--accent); border-color:var(--accent); color:#fff;}
@@ -69,6 +69,13 @@
   .btn-primary:active{filter:brightness(.92);}
   .status{margin-top:12px; font-size:13px; min-height:18px; line-height:1.4; word-break:break-word;}
   .status.err{color:var(--bad);} .status.ok{color:var(--good);} .status.wait{color:var(--dim);}
+  .plrow{display:flex; align-items:center; gap:10px; padding:11px 0; border-top:1px solid var(--line);}
+  .plrow:first-of-type{border-top:none;}
+  .plrow .pm{flex:1; min-width:0;}
+  .plrow .pn{font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .plrow .pt{font-size:12px; color:var(--dim); margin-top:2px;}
+  .plrow .x{color:var(--dim); font-size:18px; padding:4px 8px;}
+  input[type=file]{padding:10px; font-size:14px;}
   .hosts{margin-top:10px; font-size:12px; color:var(--dim); line-height:1.5; word-break:break-word;}
 
   #browse{flex:1; display:flex; flex-direction:column; overflow:hidden;}
@@ -120,10 +127,23 @@
 
 <!-- ============ SETUP ============ -->
 <section id="setup">
+  <div class="card hidden" id="savedCard">
+    <h2>My playlists</h2>
+    <p class="hint">Tap one to open it. Add as many as you like below.</p>
+    <div id="savedList"></div>
+  </div>
+
+  <div class="card" style="padding-bottom:6px;">
+    <label style="margin-top:0">Name for the next playlist (optional)</label>
+    <input id="plName" type="text" placeholder="e.g. Sports, Home, Provider 2" autocapitalize="words">
+  </div>
+
   <div class="tabs">
-    <div class="tab active" data-tab="paste">Paste list</div>
+    <div class="tab active" data-tab="paste">Paste</div>
+    <div class="tab" data-tab="file">File</div>
     <div class="tab" data-tab="url">M3U URL</div>
     <div class="tab" data-tab="xtream">Xtream</div>
+    <div class="tab" data-tab="portal">Portal</div>
   </div>
 
   <div class="card tabpane" data-pane="paste">
@@ -133,6 +153,14 @@
     <textarea id="pasteBox" placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-name=&quot;...&quot; group-title=&quot;News&quot;,Channel 1&#10;http://.../stream.m3u8"></textarea>
     <button class="btn-primary" id="loadPaste">Load channels</button>
     <div class="status" id="st-paste"></div>
+  </div>
+
+  <div class="card tabpane hidden" data-pane="file">
+    <h2>Import a playlist file</h2>
+    <p class="hint">Pick an .m3u or .m3u8 file saved on your iPhone (Files app, iCloud, downloads). Nothing is uploaded; it is read on this device.</p>
+    <label>Playlist file</label>
+    <input id="fileBox" type="file" accept=".m3u,.m3u8,.txt,audio/x-mpegurl,application/x-mpegurl,application/vnd.apple.mpegurl,text/plain">
+    <div class="status" id="st-file"></div>
   </div>
 
   <div class="card tabpane hidden" data-pane="url">
@@ -155,6 +183,17 @@
     <input id="xPass" type="text" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="btn-primary" id="loadXtream">Connect</button>
     <div class="status" id="st-xtream"></div>
+  </div>
+
+  <div class="card tabpane hidden" data-pane="portal">
+    <h2>Portal login (Stalker / MAC) <span class="tag">needs Helper</span></h2>
+    <p class="hint">For providers that give you a portal address and a MAC address instead of a username. This works only with the Helper turned on, and it is the least certain of the options: portals differ a lot.</p>
+    <label>Portal address</label>
+    <input id="pUrl" type="url" placeholder="http://portal.example.com/c/" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label>MAC address</label>
+    <input id="pMac" type="text" placeholder="00:1A:79:XX:XX:XX" autocapitalize="characters" autocorrect="off" spellcheck="false">
+    <button class="btn-primary" id="loadPortal">Connect</button>
+    <div class="status" id="st-portal"></div>
   </div>
 
   <div class="card">
@@ -273,9 +312,11 @@
     });
     return out;
   }
-  function setChannels(list){
+  var activeId="";
+  function setChannels(list,entry){
     if(!list.length){throw new Error("No channels found in that playlist.");}
     channels=list;
+    if(entry){ activeId=entry.id; save("active",activeId); }
     var groups={}, sel=document.getElementById("groupSel");
     sel.innerHTML='<option value="">All groups</option>';
     list.forEach(function(c){groups[c.group]=(groups[c.group]||0)+1;});
@@ -353,7 +394,7 @@
     show("player");
     var msg=document.getElementById("pmsg"); msg.classList.add("hidden");
     stopAll();
-    var token=playToken, tries=candidates(c.url), notes=[];
+    var token=playToken, tries, notes=[];
 
     function fail(){
       var m="Couldn't play this channel. "+notes.join(" · ")+".";
@@ -399,7 +440,16 @@
       }
       watchdog=setTimeout(function(){ bad("no data after 15 seconds"); },15000);
     }
-    attempt(0);
+    if(c.stalker){
+      msg.textContent="Getting the stream link from the portal…"; msg.classList.remove("hidden");
+      resolveStalker(c).then(function(u){
+        if(token!==playToken) return;
+        msg.classList.add("hidden"); tries=candidates(u); attempt(0);
+      }).catch(function(e){
+        if(token!==playToken) return;
+        msg.textContent="The portal would not give a link for this channel ("+e.message+")."; msg.classList.remove("hidden");
+      });
+    } else { tries=candidates(c.url); attempt(0); }
   }
   document.getElementById("btnBack").onclick=function(){
     stopAll();
@@ -426,26 +476,216 @@
 
   // ---------- loaders ----------
   function st(id,msg,cls){var e=document.getElementById(id); e.textContent=msg; e.className="status "+(cls||"");}
+  function enc(x){return encodeURIComponent(x);}
 
-  function fetchText(url){
-    return fetch(proxify(url,"txt")).then(function(r){
+  function fetchText(url,opts){
+    return fetch(proxify(url,"txt"),opts||{}).then(function(r){
       if(!r.ok) throw new Error("the server answered "+r.status);
       return r.text();
     });
   }
-  function hint(){ return getHelper()?"":" If this keeps failing, use the Paste list tab, or set up the Helper below."; }
+  function fetchJSON(url,opts){
+    return fetchText(url,opts).then(function(t){
+      try{return JSON.parse(t);}catch(e){throw new Error("the server did not send a valid reply");}
+    });
+  }
+  function hint(){ return getHelper()?"":" If this keeps failing, turn on the Helper (below), or use Paste / File."; }
+  function niceErr(e){
+    var m=(e&&e.message)||String(e);
+    if(/load failed|failed to fetch|networkerror/i.test(m)) m="the connection was blocked or refused";
+    return m;
+  }
+
+  // --- Xtream Codes ---
+  function loadXtream(host,u,p){
+    var base=host+"/player_api.php?username="+enc(u)+"&password="+enc(p);
+    return Promise.all([
+      fetchJSON(base+"&action=get_live_streams"),
+      fetchJSON(base+"&action=get_live_categories").catch(function(){return [];})
+    ]).then(function(r){
+      var arr=r[0], cats={};
+      if(arr&&arr.user_info&&String(arr.user_info.auth)==="0") throw new Error("login refused — check the username and password");
+      if(!Array.isArray(arr)||!arr.length) throw new Error("no live channels returned — check the server, username and password");
+      (Array.isArray(r[1])?r[1]:[]).forEach(function(c){cats[c.category_id]=c.category_name;});
+      return arr.map(function(s){
+        return {
+          name:s.name||("Channel "+s.stream_id),
+          logo:/^https?:/i.test(s.stream_icon||"")?s.stream_icon:"",
+          group:s.category_name||cats[s.category_id]||"Live",
+          url:host+"/live/"+enc(u)+"/"+enc(p)+"/"+s.stream_id+".ts"
+        };
+      });
+    }).catch(function(firstErr){
+      // some servers only serve the plain playlist, so try that before giving up
+      return fetchText(host+"/get.php?username="+enc(u)+"&password="+enc(p)+"&type=m3u_plus&output=ts")
+        .then(function(t){
+          var l=parseM3U(t);
+          if(!l.length||l.length===1&&!/#EXTINF/i.test(t)) throw firstErr;
+          return l;
+        }).catch(function(){ throw firstErr; });
+    });
+  }
+
+  // --- Portal (Stalker / MAC) ---
+  var STK_PATHS=["/portal.php","/stalker_portal/server/load.php","/server/load.php"];
+  function stkOrigin(portal){
+    var u=new URL(/^https?:\/\//i.test(portal)?portal:"http://"+portal);
+    return u.origin;
+  }
+  function stkCall(ctx,query){
+    var h={"X-Cookie":"mac="+ctx.mac+"; stb_lang=en_US; timezone=Asia/Kolkata"};
+    if(ctx.token) h["X-Authorization"]="Bearer "+ctx.token;
+    return fetchText(ctx.base+"?"+query+"&JsHttpRequest=1-xml",{headers:h}).then(function(t){
+      var j; try{j=JSON.parse(t);}catch(e){throw new Error("the portal did not send a valid reply");}
+      return j&&j.js!==undefined?j.js:j;
+    });
+  }
+  function stkLogin(portal,mac){
+    if(!getHelper()) return Promise.reject(new Error("portal logins need the Helper turned on"));
+    var origin=stkOrigin(portal), i=0, lastErr, firstErr;
+    function tryPath(){
+      if(i>=STK_PATHS.length) return Promise.reject(lastErr||new Error("could not log in"));
+      var ctx={base:origin+STK_PATHS[i++],mac:mac,token:""};
+      return stkCall(ctx,"type=stb&action=handshake&token=").then(function(js){
+        if(!js||!js.token) throw new Error("the portal did not accept this MAC address");
+        ctx.token=js.token;
+        return stkCall(ctx,"type=stb&action=get_profile&hd=1&ver=ImageDescription:%200.2.18-r14-pub-250;%20PORTAL%20version:%205.5.0&num_banks=1&stb_type=MAG250&auth_second_step=1").catch(function(){return null;});
+      }).then(function(){return ctx;}).catch(function(e){firstErr=firstErr||e; lastErr=firstErr; return tryPath();});
+    }
+    return tryPath();
+  }
+  function loadPortal(portal,mac){
+    mac=mac.trim().toUpperCase();
+    if(!/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac)) return Promise.reject(new Error("the MAC address should look like 00:1A:79:AB:CD:EF"));
+    return stkLogin(portal,mac).then(function(ctx){
+      return Promise.all([
+        stkCall(ctx,"type=itv&action=get_genres").catch(function(){return [];}),
+        stkCall(ctx,"type=itv&action=get_all_channels").catch(function(){return null;})
+      ]).then(function(r){
+        var genres={}; (Array.isArray(r[0])?r[0]:[]).forEach(function(g){genres[g.id]=g.title;});
+        function conv(arr){
+          return arr.map(function(c){
+            return {name:c.name||"Channel", logo:/^https?:/i.test(c.logo||"")?c.logo:"", group:genres[c.tv_genre_id]||"Live",
+              url:"portal://"+new URL(ctx.base).host+"/"+(c.id||c.cmd), stalker:{portal:portal,mac:mac,cmd:c.cmd}};
+          }).filter(function(c){return c.stalker.cmd;});
+        }
+        if(r[1]&&r[1].data&&r[1].data.length) return conv(r[1].data);
+        // some portals only hand out channels page by page
+        var all=[], page=1;
+        function next(){
+          return stkCall(ctx,"type=itv&action=get_ordered_list&genre=*&sortby=number&p="+page).then(function(js){
+            var d=(js&&js.data)||[]; all=all.concat(d);
+            var total=js&&js.total_items?+js.total_items:0;
+            if(d.length&&page<60&&(!total||all.length<total)){page++; return next();}
+            return conv(all);
+          });
+        }
+        return next();
+      });
+    });
+  }
+  function resolveStalker(c){
+    var s=c.stalker;
+    return stkLogin(s.portal,s.mac).then(function(ctx){
+      return stkCall(ctx,"type=itv&action=create_link&cmd="+enc(s.cmd)+"&series=&forced_storage=undefined&disable_ad=0&download=0");
+    }).then(function(js){
+      var cmd=(js&&js.cmd)||"";
+      cmd=cmd.replace(/^(ffmpeg|ffrt\d*|auto)\s+/i,"").trim();
+      if(!/^https?:\/\//i.test(cmd)) throw new Error("no playable address came back");
+      return cmd;
+    });
+  }
+
+  // ---------- saved playlists ----------
+  var TYPE_LABEL={paste:"Pasted list",file:"File",url:"M3U link",xtream:"Xtream",portal:"Portal"};
+  function readLists(){try{return JSON.parse(get("lists")||"[]");}catch(e){return [];}}
+  function writeLists(a){save("lists",JSON.stringify(a));}
+  function hash(str){var h=5381; for(var i=0;i<str.length;i++){h=((h<<5)+h+str.charCodeAt(i))|0;} return (h>>>0).toString(36);}
+  function defaultName(type,data){
+    try{
+      if(type==="url") return new URL(data.url).hostname;
+      if(type==="xtream") return new URL(data.host).hostname;
+      if(type==="portal") return new URL(/^https?:/i.test(data.portal)?data.portal:"http://"+data.portal).hostname;
+    }catch(e){}
+    return TYPE_LABEL[type]||"Playlist";
+  }
+  function rememberList(type,data){
+    var key=type==="paste"||type==="file"?String(data.text.length)+data.text.slice(0,300)+data.text.slice(-200):JSON.stringify(data);
+    var id=type+"-"+hash(key);
+    var nm=document.getElementById("plName").value.trim()||defaultName(type,data);
+    var lists=readLists().filter(function(l){return l.id!==id;});
+    lists.unshift({id:id,type:type,name:nm,data:data});
+    writeLists(lists);
+    document.getElementById("plName").value="";
+    renderSaved();
+    return {id:id};
+  }
+  function renderSaved(){
+    var lists=readLists(), box=document.getElementById("savedList");
+    document.getElementById("savedCard").classList.toggle("hidden",!lists.length);
+    box.innerHTML="";
+    lists.forEach(function(l){
+      var row=document.createElement("div"); row.className="plrow";
+      var m=document.createElement("div"); m.className="pm";
+      var n=document.createElement("div"); n.className="pn"; n.textContent=l.name;
+      var t=document.createElement("div"); t.className="pt"; t.textContent=TYPE_LABEL[l.type]||l.type;
+      m.appendChild(n); m.appendChild(t);
+      var x=document.createElement("div"); x.className="x"; x.textContent="✕";
+      x.onclick=function(e){e.stopPropagation(); writeLists(readLists().filter(function(q){return q.id!==l.id;})); renderSaved();};
+      row.appendChild(m); row.appendChild(x);
+      row.onclick=function(){openSaved(l);};
+      box.appendChild(row);
+    });
+  }
+  function openSaved(l){
+    var sid={paste:"st-paste",file:"st-file",url:"st-url",xtream:"st-xtream",portal:"st-portal"}[l.type];
+    var say=function(m,c){st(sid,m,c);};
+    say("Opening "+l.name+"…","wait");
+    var p;
+    if(l.type==="paste"||l.type==="file") p=Promise.resolve(parseM3U(l.data.text));
+    else if(l.type==="url") p=fetchText(l.data.url).then(parseM3U);
+    else if(l.type==="xtream") p=loadXtream(l.data.host,l.data.u,l.data.p);
+    else p=loadPortal(l.data.portal,l.data.mac);
+    p.then(function(list){ setChannels(list,l); }).catch(function(e){
+      say("Couldn't open "+l.name+" ("+niceErr(e)+")."+hint(),"err");
+      document.getElementById("savedCard").scrollIntoView();
+    });
+  }
+
+  // ---------- source buttons ----------
+  function finish(type,data,list,sid){
+    var entry=rememberList(type,data);
+    if(sid) st(sid,"Loaded "+list.length+" channels.","ok");
+    setChannels(list,entry);
+  }
 
   document.getElementById("loadPaste").onclick=function(){
     try{
       var txt=document.getElementById("pasteBox").value;
       if(!txt.trim()){st("st-paste","Paste your playlist text first.","err"); return;}
       if(/^\s*https?:\/\//i.test(txt) && txt.trim().indexOf("\n")<0){
-        st("st-paste","That's a link, not the playlist itself. Open the link in a new Safari tab, copy the text it shows (starts with #EXTM3U), and paste that here.","err"); return;
+        st("st-paste","That's a link, not the playlist itself. Use the M3U URL tab for links, or open the link in Safari, copy the text it shows (starts with #EXTM3U), and paste that here.","err"); return;
       }
       var list=parseM3U(txt);
-      save("lastM3U",txt);
-      setChannels(list);
+      if(!list.length) throw new Error("No channels found in that text.");
+      finish("paste",{text:txt},list,"st-paste");
     }catch(e){st("st-paste",e.message,"err");}
+  };
+
+  document.getElementById("fileBox").onchange=function(){
+    var f=this.files&&this.files[0]; if(!f) return;
+    st("st-file","Reading "+f.name+"…","wait");
+    var rd=new FileReader();
+    rd.onload=function(){
+      try{
+        var txt=String(rd.result||""), list=parseM3U(txt);
+        if(!list.length) throw new Error("No channels found in that file.");
+        if(!document.getElementById("plName").value.trim()) document.getElementById("plName").value=f.name.replace(/\.[^.]+$/,"");
+        finish("file",{text:txt},list,"st-file");
+      }catch(e){st("st-file",e.message,"err");}
+    };
+    rd.onerror=function(){st("st-file","Couldn't read that file.","err");};
+    rd.readAsText(f);
   };
 
   document.getElementById("loadUrl").onclick=function(){
@@ -457,11 +697,10 @@
     st("st-url","Fetching…","wait");
     fetchText(url).then(function(txt){
       var list=parseM3U(txt);
-      save("lastM3U",txt);
-      st("st-url","Loaded "+list.length+" channels.","ok");
-      setChannels(list);
+      if(!list.length) throw new Error("that address did not return a playlist");
+      finish("url",{url:url},list,"st-url");
     }).catch(function(e){
-      st("st-url","Couldn't load ("+e.message+")."+hint(),"err");
+      st("st-url","Couldn't load ("+niceErr(e)+")."+hint(),"err");
     });
   };
 
@@ -470,22 +709,25 @@
     var u=document.getElementById("xUser").value.trim();
     var p=document.getElementById("xPass").value.trim();
     if(!host||!u||!p){st("st-xtream","Fill in all three fields.","err"); return;}
+    if(!/^https?:\/\//i.test(host)) host="http://"+host;
     st("st-xtream","Connecting…","wait");
-    var api=host+"/player_api.php?username="+encodeURIComponent(u)+"&password="+encodeURIComponent(p)+"&action=get_live_streams";
-    fetchText(api).then(function(txt){return JSON.parse(txt);}).then(function(arr){
-      if(!Array.isArray(arr)||!arr.length) throw new Error("no live streams returned — check the username, password and server");
-      var list=arr.map(function(s){
-        return {
-          name:s.name||("Channel "+s.stream_id),
-          logo:s.stream_icon||"",
-          group:s.category_name||"Live",
-          url:host+"/live/"+encodeURIComponent(u)+"/"+encodeURIComponent(p)+"/"+s.stream_id+".ts"
-        };
-      });
-      st("st-xtream","Connected — "+list.length+" channels.","ok");
-      setChannels(list);
+    loadXtream(host,u,p).then(function(list){
+      finish("xtream",{host:host,u:u,p:p},list,"st-xtream");
     }).catch(function(e){
-      st("st-xtream","Couldn't connect ("+e.message+")."+hint(),"err");
+      st("st-xtream","Couldn't connect ("+niceErr(e)+")."+hint(),"err");
+    });
+  };
+
+  document.getElementById("loadPortal").onclick=function(){
+    var portal=document.getElementById("pUrl").value.trim();
+    var mac=document.getElementById("pMac").value.trim();
+    if(!portal||!mac){st("st-portal","Fill in the portal address and the MAC address.","err"); return;}
+    st("st-portal","Logging in to the portal… this can take a little while.","wait");
+    loadPortal(portal,mac).then(function(list){
+      if(!list.length) throw new Error("the portal returned no channels");
+      finish("portal",{portal:portal,mac:mac.trim().toUpperCase()},list,"st-portal");
+    }).catch(function(e){
+      st("st-portal","Couldn't connect ("+niceErr(e)+").","err");
     });
   };
 
@@ -496,8 +738,8 @@
     st("st-helper","Testing…","wait");
     fetch(v+"/").then(function(r){return r.text();}).then(function(t){
       if(t.indexOf("MyTV helper")<0) throw new Error("that address did not answer like the helper");
-      save("helper",v); showHelperTag(); st("st-helper","Helper is running ✓ — channels and playlists now go through it.","ok");
-    }).catch(function(e){ st("st-helper","Couldn't reach it ("+e.message+").","err"); });
+      save("helper",v); showHelperTag(); st("st-helper","Helper is running ✓ — playlists and channels now go through it.","ok");
+    }).catch(function(e){ st("st-helper","Couldn't reach it ("+niceErr(e)+").","err"); });
   };
 
   document.getElementById("search").oninput=render;
@@ -505,19 +747,27 @@
 
   document.getElementById("btnSetup").onclick=function(){show("setup");};
   document.getElementById("btnReload").onclick=function(){
-    var txt=get("lastM3U");
-    if(txt){try{setChannels(parseM3U(txt));}catch(e){show("setup");}}
-    else show("setup");
+    var l=readLists().filter(function(x){return x.id===activeId;})[0];
+    if(l) openSaved(l); else show("setup");
   };
 
-  // ---------- restore last session ----------
+  window.__mytv.loadXtream=loadXtream; window.__mytv.loadPortal=loadPortal; window.__mytv.resolveStalker=resolveStalker;
+
+  // ---------- start ----------
   (function init(){
     document.getElementById("helperBox").value=getHelper();
     showHelperTag();
-    var txt=get("lastM3U");
-    if(txt){
-      document.getElementById("pasteBox").value=txt;
-      try{ setChannels(parseM3U(txt)); return; }catch(e){}
+    // carry over a playlist saved by the older version
+    var old=get("lastM3U");
+    if(old && !readLists().length){
+      try{ var l0=parseM3U(old); if(l0.length){ writeLists([{id:"paste-"+hash(old),type:"paste",name:"Pasted list",data:{text:old}}]); } }catch(e){}
+      save("lastM3U","");
+    }
+    renderSaved();
+    var lists=readLists(), a=get("active");
+    var first=lists.filter(function(l){return l.id===a;})[0];
+    if(first && (first.type==="paste"||first.type==="file")){
+      try{ setChannels(parseM3U(first.data.text),first); return; }catch(e){}
     }
     show("setup");
   })();
