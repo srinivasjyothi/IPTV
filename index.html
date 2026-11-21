@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MyTV">
+<meta name="theme-color" content="#0b0d12">
+<title>MyTV — IPTV Player</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#151922; --panel2:#1d2330; --line:#262d3b;
+    --txt:#eef1f6; --dim:#9aa3b2; --accent:#4f7cff; --accent2:#2b4bdb;
+    --good:#34c77b; --bad:#ff5a67; --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; height:100dvh; overflow:hidden;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button{font-family:inherit; cursor:pointer;}
+  .hidden{display:none !important;}
+
+  /* ---------- Top bar ---------- */
+  header{
+    display:flex; align-items:center; gap:10px; padding:12px 14px;
+    background:var(--panel); border-bottom:1px solid var(--line); flex-shrink:0;
+  }
+  header .logo{font-weight:700; font-size:18px; letter-spacing:.3px;}
+  header .logo span{color:var(--accent);}
+  header .spacer{flex:1;}
+  .iconbtn{
+    background:var(--panel2); border:1px solid var(--line); color:var(--txt);
+    border-radius:10px; padding:8px 12px; font-size:13px; font-weight:600;
+  }
+  .iconbtn:active{background:#2a3242;}
+
+  /* ---------- Setup screen ---------- */
+  #setup{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 16px 40px;}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px; max-width:560px; margin:0 auto 16px;
+  }
+  .card h2{margin:0 0 4px; font-size:16px;}
+  .card p.hint{margin:0 0 14px; color:var(--dim); font-size:13px; line-height:1.5;}
+  .tabs{display:flex; gap:6px; margin-bottom:16px; max-width:560px; margin-left:auto; margin-right:auto;}
+  .tab{
+    flex:1; text-align:center; padding:11px 8px; border-radius:10px; font-size:13px; font-weight:600;
+    background:var(--panel); border:1px solid var(--line); color:var(--dim);
+  }
+  .tab.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  label{display:block; font-size:12px; color:var(--dim); margin:12px 0 6px; font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
+  input,textarea{
+    width:100%; background:var(--bg); border:1px solid var(--line); color:var(--txt);
+    border-radius:10px; padding:12px 13px; font-size:15px; font-family:inherit;
+  }
+  input:focus,textarea:focus{outline:none; border-color:var(--accent);}
+  textarea{min-height:120px; resize:vertical; font-size:13px; line-height:1.4;}
+  .btn-primary{
+    width:100%; margin-top:18px; padding:14px; border:none; border-radius:11px;
+    background:linear-gradient(180deg,var(--accent),var(--accent2)); color:#fff;
+    font-size:15px; font-weight:700;
+  }
+  .btn-primary:active{filter:brightness(.92);}
+  .status{margin-top:12px; font-size:13px; min-height:18px; line-height:1.4;}
+  .status.err{color:var(--bad);} .status.ok{color:var(--good);} .status.wait{color:var(--dim);}
+
+  /* ---------- Channel list ---------- */
+  #browse{flex:1; display:flex; flex-direction:column; overflow:hidden;}
+  .filters{display:flex; gap:8px; padding:10px 12px; background:var(--panel); border-bottom:1px solid var(--line); flex-shrink:0;}
+  .filters input{flex:1; padding:10px 12px; font-size:14px;}
+  .filters select{
+    background:var(--bg); border:1px solid var(--line); color:var(--txt);
+    border-radius:10px; padding:0 10px; font-size:13px; max-width:40%;
+  }
+  #list{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  .chan{
+    display:flex; align-items:center; gap:12px; padding:11px 14px;
+    border-bottom:1px solid var(--line);
+  }
+  .chan:active{background:var(--panel2);}
+  .chan .logo{
+    width:46px; height:46px; border-radius:9px; background:var(--panel2); flex-shrink:0;
+    object-fit:contain; display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:var(--dim); overflow:hidden; border:1px solid var(--line);
+  }
+  .chan .meta{flex:1; min-width:0;}
+  .chan .name{font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .chan .grp{font-size:12px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;}
+  .count{padding:8px 14px; color:var(--dim); font-size:12px; background:var(--bg);}
+  .fav{font-size:18px; color:var(--dim); padding:4px 6px;}
+  .fav.on{color:#ffcb45;}
+
+  /* ---------- Player ---------- */
+  #player{position:fixed; inset:0; background:#000; z-index:50; display:flex; flex-direction:column;}
+  #player .pbar{
+    display:flex; align-items:center; gap:10px; padding:12px 14px;
+    padding-top:calc(12px + env(safe-area-inset-top));
+    background:linear-gradient(180deg,rgba(0,0,0,.8),rgba(0,0,0,0)); position:absolute; top:0; left:0; right:0; z-index:2;
+    transition:opacity .3s;
+  }
+  #player .pbar .title{flex:1; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  #vwrap{flex:1; display:flex; align-items:center; justify-content:center;}
+  video{width:100%; height:100%; background:#000;}
+  .pmsg{position:absolute; bottom:40px; left:0; right:0; text-align:center; color:var(--dim); font-size:13px; padding:0 20px; line-height:1.5;}
+  footer{padding:7px 14px; text-align:center; color:#5a6475; font-size:11px; background:var(--panel); border-top:1px solid var(--line); flex-shrink:0;}
+  a{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">My<span>TV</span></div>
+  <div class="spacer"></div>
+  <button class="iconbtn hidden" id="btnReload">Reload</button>
+  <button class="iconbtn hidden" id="btnSetup">Sources</button>
+</header>
+
+<!-- ============ SETUP ============ -->
+<section id="setup">
+  <div class="tabs">
+    <div class="tab active" data-tab="paste">Paste list</div>
+    <div class="tab" data-tab="url">M3U URL</div>
+    <div class="tab" data-tab="xtream">Xtream</div>
+  </div>
+
+  <!-- Paste -->
+  <div class="card tabpane" data-pane="paste">
+    <h2>Paste your playlist</h2>
+    <p class="hint">Always works, on any device. Open your M3U playlist in a browser or a text app, copy everything, and paste it here.</p>
+    <label>M3U content</label>
+    <textarea id="pasteBox" placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-name=&quot;...&quot; group-title=&quot;News&quot;,Channel 1&#10;http://.../stream.m3u8"></textarea>
+    <button class="btn-primary" id="loadPaste">Load channels</button>
+    <div class="status" id="st-paste"></div>
+  </div>
+
+  <!-- URL -->
+  <div class="card tabpane hidden" data-pane="url">
+    <h2>Load from M3U URL</h2>
+    <p class="hint">Fetches the playlist directly. Works when this page is opened normally in Safari (saved to your phone), not when viewed through a hosting sandbox.</p>
+    <label>Playlist URL</label>
+    <input id="urlBox" type="url" placeholder="http://provider.com/get.php?username=...&type=m3u_plus" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="btn-primary" id="loadUrl">Fetch &amp; load</button>
+    <div class="status" id="st-url"></div>
+  </div>
+
+  <!-- Xtream -->
+  <div class="card tabpane hidden" data-pane="xtream">
+    <h2>Xtream Codes login</h2>
+    <p class="hint">Enter the server, username and password your provider gave you.</p>
+    <label>Server URL</label>
+    <input id="xHost" type="url" placeholder="http://server.com:8080" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label>Username</label>
+    <input id="xUser" type="text" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label>Password</label>
+    <input id="xPass" type="text" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="btn-primary" id="loadXtream">Connect</button>
+    <div class="status" id="st-xtream"></div>
+  </div>
+
+  <div class="card" style="text-align:center;">
+    <p class="hint" style="margin:0;">Add to Home Screen (Share → Add to Home Screen) to use this like an app, full-screen with its own icon.</p>
+  </div>
+</section>
+
+<!-- ============ BROWSE ============ -->
+<section id="browse" class="hidden">
+  <div class="filters">
+    <input id="search" type="search" placeholder="Search channels" autocapitalize="off" autocorrect="off">
+    <select id="groupSel"><option value="">All groups</option></select>
+  </div>
+  <div class="count" id="count"></div>
+  <div id="list"></div>
+</section>
+
+<!-- ============ PLAYER ============ -->
+<section id="player" class="hidden">
+  <div class="pbar" id="pbar">
+    <button class="iconbtn" id="btnBack">‹ Back</button>
+    <div class="title" id="pTitle"></div>
+  </div>
+  <div id="vwrap">
+    <video id="video" playsinline webkit-playsinline controls autoplay></video>
+  </div>
+  <div class="pmsg hidden" id="pmsg"></div>
+</section>
+
+<footer>Plays HLS (m3u8) streams natively in Safari · Your playlist stays on this device</footer>
+
+<script>
+(function(){
+  "use strict";
+  var channels=[], view=[], favs=loadFavs();
+
+  // ---------- storage helpers (safe) ----------
+  function save(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+  function get(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+  function loadFavs(){try{return JSON.parse(get("favs")||"[]");}catch(e){return [];}}
+  function saveFavs(){save("favs",JSON.stringify(favs));}
+
+  // ---------- M3U parser ----------
+  function parseM3U(text){
+    var out=[], lines=text.split(/\r?\n/), cur=null;
+    for(var i=0;i<lines.length;i++){
+      var ln=lines[i].trim();
+      if(!ln) continue;
+      if(ln.indexOf("#EXTINF")===0){
+        var name=ln.substring(ln.lastIndexOf(",")+1).trim();
+        cur={name:name||"Channel", logo:attr(ln,"tvg-logo"), group:attr(ln,"group-title")||"Other"};
+      } else if(ln.charAt(0)==="#"){
+        continue;
+      } else if(cur){
+        cur.url=ln; out.push(cur); cur=null;
+      } else {
+        out.push({name:"Channel "+(out.length+1), logo:"", group:"Other", url:ln});
+      }
+    }
+    return out;
+  }
+  function attr(line,key){
+    var m=line.match(new RegExp(key+'="([^"]*)"'));
+    return m?m[1]:"";
+  }
+
+  // ---------- load into UI ----------
+  function setChannels(list){
+    if(!list.length){throw new Error("No channels found in that playlist.");}
+    channels=list;
+    var groups={}, sel=document.getElementById("groupSel");
+    sel.innerHTML='<option value="">All groups</option>';
+    list.forEach(function(c){groups[c.group]=(groups[c.group]||0)+1;});
+    Object.keys(groups).sort().forEach(function(g){
+      var o=document.createElement("option"); o.value=g; o.textContent=g+" ("+groups[g]+")"; sel.appendChild(o);
+    });
+    show("browse");
+    document.getElementById("btnReload").classList.remove("hidden");
+    document.getElementById("btnSetup").classList.remove("hidden");
+    render();
+  }
+
+  function render(){
+    var q=document.getElementById("search").value.toLowerCase().trim();
+    var g=document.getElementById("groupSel").value;
+    view=channels.filter(function(c){
+      if(g && c.group!==g) return false;
+      if(q && c.name.toLowerCase().indexOf(q)<0) return false;
+      return true;
+    });
+    view.sort(function(a,b){
+      var fa=favs.indexOf(a.url)>=0, fb=favs.indexOf(b.url)>=0;
+      if(fa!==fb) return fa?-1:1; return 0;
+    });
+    var list=document.getElementById("list");
+    document.getElementById("count").textContent=view.length+" channel"+(view.length!==1?"s":"");
+    list.innerHTML="";
+    var frag=document.createDocumentFragment();
+    view.slice(0,600).forEach(function(c){
+      var row=document.createElement("div"); row.className="chan";
+      var logo=document.createElement(c.logo?"img":"div"); logo.className="logo";
+      if(c.logo){logo.src=c.logo; logo.loading="lazy"; logo.onerror=function(){this.replaceWith(txtLogo(c.name));};}
+      else{logo.textContent=initials(c.name);}
+      var meta=document.createElement("div"); meta.className="meta";
+      var nm=document.createElement("div"); nm.className="name"; nm.textContent=c.name;
+      var gp=document.createElement("div"); gp.className="grp"; gp.textContent=c.group;
+      meta.appendChild(nm); meta.appendChild(gp);
+      var fav=document.createElement("div"); fav.className="fav"+(favs.indexOf(c.url)>=0?" on":""); fav.textContent="★";
+      fav.onclick=function(e){e.stopPropagation(); toggleFav(c.url); render();};
+      row.appendChild(logo); row.appendChild(meta); row.appendChild(fav);
+      row.onclick=function(){play(c);};
+      frag.appendChild(row);
+    });
+    list.appendChild(frag);
+    if(view.length>600){
+      var more=document.createElement("div"); more.className="count"; more.textContent="Showing first 600 — search to narrow down.";
+      list.appendChild(more);
+    }
+  }
+  function initials(n){return n.replace(/[^A-Za-z0-9 ]/g,"").split(" ").filter(Boolean).slice(0,2).map(function(w){return w[0];}).join("").toUpperCase()||"TV";}
+  function txtLogo(n){var d=document.createElement("div"); d.className="logo"; d.textContent=initials(n); return d;}
+  function toggleFav(u){var i=favs.indexOf(u); if(i<0)favs.push(u); else favs.splice(i,1); saveFavs();}
+
+  // ---------- player ----------
+  var video=document.getElementById("video");
+  function play(c){
+    document.getElementById("pTitle").textContent=c.name;
+    show("player");
+    var msg=document.getElementById("pmsg"); msg.classList.add("hidden");
+    video.src=c.url;
+    var p=video.play();
+    if(p&&p.catch){p.catch(function(){});}
+    video.onerror=function(){
+      var mixed = c.url.indexOf("http://")===0 && location.protocol==="https:";
+      msg.textContent = mixed
+        ? "Couldn't play this channel — the page is loaded securely (https) but this stream is http, and Safari blocks that mix. If your provider offers an https:// link, that would work directly."
+        : "Couldn't play this channel. Safari plays HLS (.m3u8) streams; other formats like raw MPEG-TS won't play in a browser. Try another channel.";
+      msg.classList.remove("hidden");
+    };
+  }
+  document.getElementById("btnBack").onclick=function(){
+    video.pause(); video.removeAttribute("src"); video.load();
+    show("browse");
+  };
+
+  // ---------- navigation ----------
+  function show(id){
+    ["setup","browse","player"].forEach(function(s){
+      document.getElementById(s).classList.toggle("hidden", s!==id);
+    });
+    document.getElementById("setup").style.display = id==="setup"?"":"none";
+  }
+
+  document.querySelectorAll(".tab").forEach(function(t){
+    t.onclick=function(){
+      document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active");});
+      t.classList.add("active");
+      document.querySelectorAll(".tabpane").forEach(function(p){
+        p.classList.toggle("hidden", p.getAttribute("data-pane")!==t.getAttribute("data-tab"));
+      });
+    };
+  });
+
+  // ---------- loaders ----------
+  function st(id,msg,cls){var e=document.getElementById(id); e.textContent=msg; e.className="status "+(cls||"");}
+
+  document.getElementById("loadPaste").onclick=function(){
+    try{
+      var txt=document.getElementById("pasteBox").value;
+      if(!txt.trim()){st("st-paste","Paste your playlist text first.","err"); return;}
+      var list=parseM3U(txt);
+      save("lastM3U",txt);
+      setChannels(list);
+    }catch(e){st("st-paste",e.message,"err");}
+  };
+
+  document.getElementById("loadUrl").onclick=function(){
+    var url=document.getElementById("urlBox").value.trim();
+    if(!url){st("st-url","Enter a playlist URL.","err"); return;}
+    st("st-url","Fetching…","wait");
+    fetch(url).then(function(r){
+      if(!r.ok) throw new Error("Server returned "+r.status);
+      return r.text();
+    }).then(function(txt){
+      var list=parseM3U(txt);
+      save("lastM3U",txt);
+      st("st-url","Loaded "+list.length+" channels.","ok");
+      setChannels(list);
+    }).catch(function(e){
+      st("st-url","Couldn't load — "+e.message+". Try the “Paste list” tab instead.","err");
+    });
+  };
+
+  document.getElementById("loadXtream").onclick=function(){
+    var host=document.getElementById("xHost").value.trim().replace(/\/+$/,"");
+    var u=document.getElementById("xUser").value.trim();
+    var p=document.getElementById("xPass").value.trim();
+    if(!host||!u||!p){st("st-xtream","Fill in all three fields.","err"); return;}
+    st("st-xtream","Connecting…","wait");
+    var api=host+"/player_api.php?username="+encodeURIComponent(u)+"&password="+encodeURIComponent(p)+"&action=get_live_streams";
+    fetch(api).then(function(r){return r.json();}).then(function(arr){
+      if(!Array.isArray(arr)||!arr.length) throw new Error("No live streams returned — check your username/password/server.");
+      var list=arr.map(function(s){
+        return {
+          name:s.name||("Channel "+s.stream_id),
+          logo:s.stream_icon||"",
+          group:s.category_name||"Live",
+          url:host+"/live/"+encodeURIComponent(u)+"/"+encodeURIComponent(p)+"/"+s.stream_id+".m3u8"
+        };
+      });
+      st("st-xtream","Connected — "+list.length+" channels.","ok");
+      setChannels(list);
+    }).catch(function(e){
+      st("st-xtream","Couldn't connect — "+e.message+". Double-check the details, or try “Paste list”.","err");
+    });
+  };
+
+  document.getElementById("search").oninput=render;
+  document.getElementById("groupSel").onchange=render;
+
+  document.getElementById("btnSetup").onclick=function(){show("setup");};
+  document.getElementById("btnReload").onclick=function(){
+    var txt=get("lastM3U");
+    if(txt){try{setChannels(parseM3U(txt));}catch(e){show("setup");}}
+    else show("setup");
+  };
+
+  (function init(){
+    var txt=get("lastM3U");
+    if(txt){
+      document.getElementById("pasteBox").value=txt;
+      try{ setChannels(parseM3U(txt)); return; }catch(e){}
+    }
+    show("setup");
+  })();
+})();
+</script>
+</body>
+</html>
