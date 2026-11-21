@@ -319,7 +319,9 @@
       try{
         tsPlayer=mpegts.createPlayer({type:"mpegts", isLive:true, url:c.url});
         tsPlayer.attachMediaElement(video);
-        tsPlayer.on(mpegts.Events.ERROR, function(){ showError("MPEG-TS stream error"); });
+        tsPlayer.on(mpegts.Events.ERROR, function(errorType, errorDetail){
+          showError(String(errorType)+(errorDetail?(": "+errorDetail):""));
+        });
         tsPlayer.load();
         var p2=tsPlayer.play();
         if(p2&&p2.catch){p2.catch(function(){});}
